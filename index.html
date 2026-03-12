@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+    <meta charset="utf-8"/>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+    <title>99 Days in the Forest</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/bubbls/99itf@main/style.css"/>
+    <style>
+        canvas:focus { 
+            outline: none;
+        }
+        html, body {
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: rgba(0,0,0,0);
+            height: 100%;
+            background-color: #000;
+        }
+        #unity-container { width: 100%; height: 100%; }
+        #unity-canvas { width: 100%; height: 100%; background: #231f20; }
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 5px solid #3498db;
+            width: 50px;
+            height: 50px;
+            animation: spin 2s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="dark">
+    <div id="unity-container" class="unity-desktop">
+        <canvas id="unity-canvas" tabindex="-1"></canvas>
+        <div id="loading-cover">
+            <div id="unity-progress-bar-empty" style="display: none;">
+                <div id="unity-progress-bar-full"></div>
+            </div>
+            <div class="spinner"></div>
+        </div>
+    </div>
+
+    <script>
+        const buildUrl = "https://cdn.jsdelivr.net/gh/bubbls/99itf@main/Build";
+        const loaderUrl = buildUrl + "/Build.loader.js";
+        const cdnBaseUrl = "https://cdn.jsdelivr.net/gh/bubbls/99itf@main/";
+
+        const dataParts = [
+            cdnBaseUrl + "Build.data.br.part0",
+            cdnBaseUrl + "Build.data.br.part1",
+            cdnBaseUrl + "Build.data.br.part2",
+            cdnBaseUrl + "Build.data.br.part3",
+        ];
+        const wasmParts = [
+            cdnBaseUrl + "Build.wasm.br.part0",
+            cdnBaseUrl + "Build.wasm.br.part1",
+            cdnBaseUrl + "Build.wasm.br.part2",
+            cdnBaseUrl + "Build.wasm.br.part3",
+            cdnBaseUrl + "Build.wasm.br.part4",
+        ];
+
+        async function fetchAndCombineParts(partUrls) {
+            const buffers = [];
+            for (const url of partUrls) {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Failed to fetch ${url}`);
+                const buffer = await response.arrayBuffer();
+                buffers.push(buffer);
+            }
+            const totalLength = buffers.reduce((sum, buf) => sum + buf.byteLength, 0);
+            const combined = new Uint8Array(totalLength);
+            let offset = 0;
+            for (const buffer of buffers) {
+                combined.set(new Uint8Array(buffer), offset);
+                offset += buffer.byteLength;
+            }
+            return new Blob([combined], { type: 'application/octet-stream' });
+        }
+
+        const config = {
+            dataUrl: "", 
+            frameworkUrl: buildUrl + "/Build.framework.js",
+            codeUrl: "", 
+            streamingAssetsUrl: "StreamingAssets",
+            companyName: "DefaultCompany",
+            productName: "99Days",
+            productVersion: "0.1"
+        };
+
+        const canvas = document.querySelector("#unity-canvas");
+        const loadingCover = document.querySelector("#loading-cover");
+        const progressBarFull = document.querySelector("#unity-progress-bar-full");
+        const spinner = document.querySelector('.spinner');
+
+        // Set Language to English
+        let environmentData = {
+            language: "en",
+            browserLang: "en"
+        };
+
+        const script = document.createElement("script");
+        script.src = loaderUrl;
+        script.onload = async () => {
+            try {
+                const [dataBlob, wasmBlob] = await Promise.all([
+                    fetchAndCombineParts(dataParts),
+                    fetchAndCombineParts(wasmParts)
+                ]);
+                config.dataUrl = URL.createObjectURL(dataBlob);
+                config.codeUrl = URL.createObjectURL(wasmBlob);
+
+                createUnityInstance(canvas, config, (progress) => {
+                    spinner.style.display = "none";
+                    document.querySelector("#unity-progress-bar-empty").style.display = "";
+                    progressBarFull.style.width = `${100 * progress}%`;
+                }).then((unityInstance) => {
+                    loadingCover.style.display = "none";
+                });
+            } catch (err) {
+                console.error("Initialization failed:", err);
+            }
+        };
+        document.body.appendChild(script);
+
+        // Dummy function to satisfy internal calls without ads
+        function InitGame() {
+            console.log('Game initialized in English mode. Ads disabled.');
+        }
+    </script>
+</body>
+</html>
